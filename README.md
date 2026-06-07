@@ -1,9 +1,13 @@
-# ParallelMind: Monad Parallel Execution Profiler
+# Parallel AI Agent Orchestration on Monad
 
-> Lightweight local profiler for identifying Solidity storage patterns that can reduce Monad parallel execution efficiency.
+> This challenge combines the operational bottleneck of autonomous agents with the architectural friction of non-parallel-optimized code. To scale AI agents, we must not only solve for execution latency but also ensure the underlying contracts don’t serialize performance due to poor storage patterns.
 
-ParallelMind is a hackathon-friendly full-stack application that lets you paste or load Solidity code, analyze it with a local FastAPI profiler, and review parallel-readiness scores, storage conflict traces, refactoring suggestions, and a downloadable optimization report.
+The Problem: The "Bottlenecked Autonomy" Trap
+AI agents are expected to act as high-frequency participants in DeFi and cross-protocol orchestration. However, even on a high-throughput chain like Monad, these agents are crippled by two hidden killers:
 
+Contract-Level Serialization: Developers writing agent-orchestration contracts often use traditional "global singleton" patterns (e.g., a single mapping for all agent balances or a shared global nonces counter). This creates Storage Contention, forcing the Monad execution engine to serialize transactions that should be running in parallel.
+
+Latency-Induced Drift: In fast-moving markets (arbitrage/rebalancing), even millisecond delays in transaction confirmation—caused by re-trying conflicting transactions—lead to "slippage-induced loss" for the agent’s portfolio.
 ---
 
 ## What the Application Does
