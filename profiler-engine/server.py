@@ -6,7 +6,7 @@ import uvicorn
 
 app = FastAPI(
     title="Monad Parallel-Native Optimizer Engine Backend",
-    version="2.0.0"
+    version="2.1.0"
 )
 
 # Active Cross-Origin Resource Sharing protocol limits
@@ -20,6 +20,14 @@ app.add_middleware(
 
 class RefactorPayload(BaseModel):
     source_code: str
+
+@app.get("/api/v2/health")
+async def health_check():
+    return {
+        "status": "online",
+        "service": "Monad Parallel-Native Optimizer Engine Backend",
+        "version": app.version
+    }
 
 @app.post("/api/v2/optimize-profile")
 async def process_profiler_request(payload: RefactorPayload):
