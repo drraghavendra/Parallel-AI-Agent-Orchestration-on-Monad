@@ -55,7 +55,7 @@
                     <span class="btn minimize"></span>
                     <span class="btn expand"></span>
                 </div>
-                <div class="title">MONAD PARALLEL-NATIVE DEFI OPTIMIZER ENGINE v2.1.0</div>
+                <div class="title">MONAD PARALLEL-NATIVE DEFI OPTIMIZER ENGINE v2.3.0</div>
             </header>
 
             <div class="workspace">
@@ -98,9 +98,18 @@
                             <div id="efficiency-display" class="metric-value">--</div>
                             <div class="score-track" aria-hidden="true"><span id="score-fill"></span></div>
                         </article>
+                        <article class="metric-box score-card">
+                            <span class="box-label">DEPLOYMENT CONFIDENCE</span>
+                            <div id="confidence-display" class="metric-value">--</div>
+                            <div class="score-track" aria-hidden="true"><span id="confidence-fill"></span></div>
+                        </article>
                         <article class="metric-box">
-                            <span class="box-label">COMPILATION STATUS</span>
+                            <span class="box-label">READINESS CLASSIFICATION</span>
                             <div id="status-display" class="status-pill text-neutral">READY</div>
+                        </article>
+                        <article class="metric-box">
+                            <span class="box-label">CONFIDENCE CLASSIFICATION</span>
+                            <div id="confidence-status" class="status-pill text-neutral">READY</div>
                         </article>
                         <article class="metric-box">
                             <span class="box-label">CONFLICTS FOUND</span>
@@ -119,10 +128,24 @@
                         </div>
                     </section>
 
+                    <section class="confidence-section" aria-label="Deployment confidence score breakdown">
+                        <h3><span class="cli-arrow">&gt;</span> Confidence Breakdown</h3>
+                        <div id="confidence-breakdown" class="category-scorecard">
+                            <div class="empty-log-msg">Deployment confidence categories will appear after analysis.</div>
+                        </div>
+                    </section>
+
                     <section class="conflict-map-section" aria-label="Storage conflict map">
                         <h3><span class="cli-arrow">&gt;</span> Storage Conflict Map</h3>
                         <div id="storage-conflict-map" class="storage-conflict-map">
                             <div class="empty-log-msg">No dependency tree generated yet.</div>
+                        </div>
+                    </section>
+
+                    <section class="roadmap-section" aria-label="Confidence recovery roadmap">
+                        <h3><span class="cli-arrow">&gt;</span> Recovery Roadmap</h3>
+                        <div id="confidence-roadmap" class="roadmap-panel">
+                            <div class="empty-log-msg">Top actions to reach production readiness will appear after analysis.</div>
                         </div>
                     </section>
 
@@ -296,11 +319,17 @@ contract PostOptimizedOrchestrator {
             document.getElementById("efficiency-display").innerText = "--";
             document.getElementById("status-display").innerText = "READY";
             document.getElementById("status-display").className = "status-pill text-neutral";
+            document.getElementById("confidence-display").innerText = "--";
+            document.getElementById("confidence-status").innerText = "READY";
+            document.getElementById("confidence-status").className = "status-pill text-neutral";
             document.getElementById("conflict-count").innerText = "--";
             document.getElementById("primary-action").innerText = "Awaiting source";
             document.getElementById("score-fill").style.width = "0%";
+            document.getElementById("confidence-fill").style.width = "0%";
             document.getElementById("category-scorecard").innerHTML = '<div class="empty-log-msg">Category scores will appear after the diagnostic completes.</div>';
+            document.getElementById("confidence-breakdown").innerHTML = '<div class="empty-log-msg">Deployment confidence categories will appear after analysis.</div>';
             document.getElementById("storage-conflict-map").innerHTML = '<div class="empty-log-msg">No dependency tree generated yet.</div>';
+            document.getElementById("confidence-roadmap").innerHTML = '<div class="empty-log-msg">Top actions to reach production readiness will appear after analysis.</div>';
             document.getElementById("trace-logs").innerHTML = `<div class="empty-log-msg">${escapeHtml(message)}</div>`;
             document.getElementById("summary-panel").innerHTML = "<p>No report yet. Run the profiler to generate a use-case summary and implementation checklist.</p>";
         }
@@ -374,17 +403,26 @@ contract PostOptimizedOrchestrator {
             document.getElementById("efficiency-display").innerText = `${score}/100`;
             document.getElementById("score-fill").style.width = `${Math.max(0, Math.min(score, 100))}%`;
             document.getElementById("conflict-count").innerText = String(report.detected_vulnerabilities_count ?? conflicts.length);
-            badge.innerText = report.status || (score >= 85 ? "Production Parallel Ready" : "Serialization Danger Warning");
-            badge.className = score >= 85 ? "status-pill text-safe" : "status-pill text-alert";
-            document.getElementById("primary-action").innerText = score >= 85 ? "Ship validation" : "Shard hot state";
+            badge.innerText = report.parallel_readiness_classification || report.status || classifyParallelReadiness(score);
+            badge.className = `status-pill ${getScoreClass(score, "parallel")}`;
+            document.getElementById("primary-action").innerText = score >= 90 ? "Ship validation" : score >= 75 ? "Harden demo" : score >= 50 ? "Optimize storage" : "Fix serialization";
 
-            renderCategoryScorecard(report.category_scores || {});
+            const confidence = report.deployment_confidence || {};
+            const confidenceScore = Number(confidence.confidence_score ?? confidence.overall_score ?? 0);
+            document.getElementById("confidence-display").innerText = `${confidenceScore}/100`;
+            document.getElementById("confidence-fill").style.width = `${Math.max(0, Math.min(confidenceScore, 100))}%`;
+            document.getElementById("confidence-status").innerText = confidence.classification || classifyDeploymentConfidence(confidenceScore);
+            document.getElementById("confidence-status").className = `status-pill ${getScoreClass(confidenceScore, "confidence")}`;
+
+            renderCategoryScorecard(report.category_scores || {}, report.category_explanations || {});
+            renderConfidenceBreakdown(confidence);
             renderStorageConflictMap(report.storage_conflict_map || []);
+            renderRecoveryRoadmap(confidence.roadmap || {});
             renderConflictCards(conflicts, traceContainer, score);
             renderSummary(report, score, conflicts);
         }
 
-        function renderCategoryScorecard(categoryScores) {
+        function renderCategoryScorecard(categoryScores, explanations = {}) {
             const scorecard = document.getElementById("category-scorecard");
             const categories = [
                 "Storage Isolation",
@@ -395,18 +433,39 @@ contract PostOptimizedOrchestrator {
 
             scorecard.innerHTML = categories.map(label => {
                 const value = Number(categoryScores[label] ?? 100);
-                return `
-                    <article class="category-score-item">
-                        <div class="category-score-topline">
-                            <span>${escapeHtml(label)}</span>
-                            <strong>${value}/100</strong>
-                        </div>
-                        <div class="score-track compact" aria-hidden="true">
-                            <span style="width: ${Math.max(0, Math.min(value, 100))}%"></span>
-                        </div>
-                    </article>
-                `;
+                return renderScoreItem(label, value, explanations[label] || "No explanation returned by profiler.");
             }).join("");
+        }
+
+        function renderConfidenceBreakdown(confidence) {
+            const container = document.getElementById("confidence-breakdown");
+            const scores = confidence.category_scores || {};
+            const categories = [
+                "Smart Contract Integrity",
+                "Deployment Readiness",
+                "Agent Reliability",
+                "Profiler Accuracy"
+            ];
+
+            container.innerHTML = categories.map(label => {
+                const value = Number(scores[label] ?? 100);
+                return renderScoreItem(label, value, `Contributes to overall Deployment Confidence. Current classification: ${confidence.classification || classifyDeploymentConfidence(confidence.confidence_score || confidence.overall_score || 0)}.`);
+            }).join("");
+        }
+
+        function renderScoreItem(label, value, explanation) {
+            return `
+                <article class="category-score-item">
+                    <div class="category-score-topline">
+                        <span>${escapeHtml(label)}</span>
+                        <strong>${value}/100</strong>
+                    </div>
+                    <div class="score-track compact" aria-hidden="true">
+                        <span style="width: ${Math.max(0, Math.min(value, 100))}%"></span>
+                    </div>
+                    <p class="score-explanation">${escapeHtml(explanation)}</p>
+                </article>
+            `;
         }
 
         function renderConflictCards(conflicts, traceContainer, score) {
@@ -434,8 +493,10 @@ contract PostOptimizedOrchestrator {
                     </div>
                     <p class="desc"><strong>Function:</strong> ${escapeHtml(issue.function || "unknown")}</p>
                     <p class="desc"><strong>Storage Target:</strong> <code>${escapeHtml(issue.storage_target || "unknown")}</code></p>
+                    <p class="desc"><strong>Detection Confidence:</strong> ${escapeHtml(issue.detection_confidence_label || `${issue.detection_confidence || 0}%`)} heuristic certainty</p>
                     <div class="suggestion-block">
                         <p><strong>Issue:</strong> ${escapeHtml(suggestion.issue || issue.type || "Profiler finding")}</p>
+                        <p><strong>Severity:</strong> ${escapeHtml(issue.severity || "INFO")}</p>
                         <p><strong>Why It Matters:</strong> ${escapeHtml(suggestion.why_it_matters || issue.impact || "No impact provided.")}</p>
                         <p><strong>Suggested Refactor:</strong></p>
                         <div class="before-after-grid">
@@ -464,12 +525,19 @@ contract PostOptimizedOrchestrator {
 
             container.innerHTML = conflictMap.map(group => {
                 const targets = Array.isArray(group.storage_targets) ? group.storage_targets : [];
-                const targetRows = targets.map(target => `
-                    <li>
-                        <span class="tree-connector" aria-hidden="true"></span>
-                        <span class="storage-node">${escapeHtml(target)}</span>
-                    </li>
-                `).join("");
+                const targetRows = targets.map(target => {
+                    const targetName = typeof target === "string" ? target : target.storage_target;
+                    const conflictType = typeof target === "string" ? "Storage Conflict" : target.conflict_type;
+                    const severity = typeof target === "string" ? "INFO" : target.severity;
+                    const confidence = typeof target === "string" ? "" : ` · ${target.detection_confidence}% confidence`;
+                    return `
+                        <li>
+                            <span class="tree-connector" aria-hidden="true"></span>
+                            <span class="storage-node">${escapeHtml(targetName)}</span>
+                            <span class="conflict-meta">${escapeHtml(conflictType)} · ${escapeHtml(severity)}${escapeHtml(confidence)}</span>
+                        </li>
+                    `;
+                }).join("");
 
                 return `
                     <div class="conflict-tree">
@@ -480,14 +548,51 @@ contract PostOptimizedOrchestrator {
             }).join("");
         }
 
+        function renderRecoveryRoadmap(roadmap) {
+            const container = document.getElementById("confidence-roadmap");
+            const actions = Array.isArray(roadmap.actions) ? roadmap.actions : [];
+            if (!actions.length) {
+                container.innerHTML = '<div class="clean-pass"><strong>No confidence recovery actions required.</strong> Current confidence is already strong for the scanned heuristics.</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="roadmap-projection">
+                    <span>Projected Confidence:</span>
+                    <strong>${escapeHtml(roadmap.current_confidence ?? "--")} → ${escapeHtml(roadmap.projected_confidence ?? "--")}</strong>
+                </div>
+                <ol class="roadmap-list">
+                    ${actions.map(action => `
+                        <li>
+                            <strong>${escapeHtml(action.issue)}</strong>
+                            <p>${escapeHtml(action.action)}</p>
+                            <span class="gain-pill">Potential Gain: ${escapeHtml(action.potential_gain)}</span>
+                        </li>
+                    `).join("")}
+                </ol>
+            `;
+        }
+
         function renderSummary(report, score, conflicts) {
             const topSeverity = conflicts.some(item => item.severity === "CRITICAL") ? "critical" : conflicts.length ? "high" : "safe";
+            const confidence = report.deployment_confidence || {};
+            const confidenceDeductions = Array.isArray(confidence.deductions) ? confidence.deductions : [];
             const actions = conflicts.length
                 ? conflicts.map(item => {
-                    const suggestion = item.suggestion || {};
+                    const suggestion = item.suggestion || item.recommendation || {};
                     return `<li><strong>${escapeHtml(suggestion.issue || item.type)}:</strong> ${escapeHtml(suggestion.expected_benefit || item.remediation)}</li>`;
                 }).join("")
                 : "<li>Keep per-agent state isolated and re-run after future changes.</li>";
+            const confidenceRecommendations = confidenceDeductions.length
+                ? confidenceDeductions.map(item => `
+                    <li>
+                        <strong>${escapeHtml(item.issue)}</strong><br>
+                        Impact: ${escapeHtml(item.impact)} · Confidence Penalty: ${escapeHtml(item.confidence_penalty)}<br>
+                        Recommendation: ${escapeHtml(item.recommendation)}<br>
+                        Expected Confidence Gain: ${escapeHtml(item.expected_confidence_gain)}
+                    </li>
+                `).join("")
+                : "<li>No deployment confidence deductions returned.</li>";
 
             document.getElementById("summary-panel").innerHTML = `
                 <div class="summary-status ${topSeverity}">
@@ -496,6 +601,8 @@ contract PostOptimizedOrchestrator {
                 </div>
                 <h4>Recommended implementation checklist</h4>
                 <ul>${actions}</ul>
+                <h4>Confidence boost recommendations</h4>
+                <ul>${confidenceRecommendations}</ul>
                 <h4>Localhost run checklist</h4>
                 <ol>
                     <li>Start backend: <code>cd profiler-engine</code>, <code>pip install -r requirements.txt</code>, <code>python server.py</code>.</li>
@@ -512,6 +619,36 @@ contract PostOptimizedOrchestrator {
             document.getElementById(`${tabName}-view`).classList.add("active");
         }
 
+        function getScoreClass(score, mode) {
+            const value = Number(score || 0);
+            if (mode === "confidence") {
+                if (value >= 90) return "text-safe";
+                if (value >= 75) return "text-warn";
+                if (value >= 50) return "text-orange";
+                return "text-alert";
+            }
+            if (value >= 90) return "text-safe";
+            if (value >= 75) return "text-warn";
+            if (value >= 50) return "text-orange";
+            return "text-alert";
+        }
+
+        function classifyParallelReadiness(score) {
+            const value = Number(score || 0);
+            if (value >= 90) return "Production Parallel Ready";
+            if (value >= 75) return "Strong Parallel Candidate";
+            if (value >= 50) return "Needs Optimization";
+            return "Serialization Risk";
+        }
+
+        function classifyDeploymentConfidence(score) {
+            const value = Number(score || 0);
+            if (value >= 90) return "Production Ready";
+            if (value >= 75) return "Demo Ready";
+            if (value >= 50) return "Needs Improvements";
+            return "Not Safe To Deploy";
+        }
+
         function generateFallbackSummary(score, conflicts) {
             if (!conflicts.length) {
                 return `This contract has an overall Parallel Readiness Score of ${score}/100 with no detected storage conflict patterns.`;
@@ -524,15 +661,34 @@ contract PostOptimizedOrchestrator {
 
         function buildOptimizationReport(report) {
             const conflicts = Array.isArray(report.conflicts) ? report.conflicts : [];
+            const confidence = report.deployment_confidence || {};
+            const confidenceDeductions = Array.isArray(confidence.deductions) ? confidence.deductions : [];
+            const roadmap = confidence.roadmap || {};
             const categoryScores = report.category_scores || {};
+            const confidenceScores = confidence.category_scores || {};
             const score = report.parallel_readiness_score ?? report.overall_score ?? report.efficiency_score ?? 0;
+            const confidenceScore = confidence.confidence_score ?? confidence.overall_score ?? 0;
             const categoryLines = Object.entries(categoryScores).map(([label, value]) => `- ${label}: ${value}/100`);
+            const confidenceLines = Object.entries(confidenceScores).map(([label, value]) => `- ${label}: ${value}/100`);
+            const conflictMapLines = Array.isArray(report.storage_conflict_map) && report.storage_conflict_map.length
+                ? report.storage_conflict_map.flatMap(group => [
+                    `${group.function || "unknownFunction"}()`,
+                    ...(group.storage_targets || []).map(target => {
+                        const targetName = typeof target === "string" ? target : target.storage_target;
+                        const conflictType = typeof target === "string" ? "Storage Conflict" : target.conflict_type;
+                        const severity = typeof target === "string" ? "INFO" : target.severity;
+                        const detectionConfidence = typeof target === "string" ? "n/a" : `${target.detection_confidence}%`;
+                        return `  - ${targetName} | ${conflictType} | ${severity} | confidence ${detectionConfidence}`;
+                    })
+                ])
+                : ["No storage conflict edges detected."];
             const issueLines = conflicts.length ? conflicts.map((item, index) => {
-                const suggestion = item.suggestion || {};
+                const suggestion = item.suggestion || item.recommendation || {};
                 const refactor = suggestion.suggested_refactor || {};
                 return [
                     `${index + 1}. ${suggestion.issue || item.type}`,
                     `   Severity: ${item.severity}`,
+                    `   Detection Confidence: ${item.detection_confidence_label || `${item.detection_confidence || 0}%`}`,
                     `   Function: ${item.function || "unknown"}`,
                     `   Storage Target: ${item.storage_target || "unknown"}`,
                     `   Line: ${item.line || "n/a"}`,
@@ -545,18 +701,39 @@ contract PostOptimizedOrchestrator {
                     `   Expected Benefit: ${suggestion.expected_benefit || item.remediation || "Improves parallel execution readiness."}`
                 ].join("\n");
             }) : ["No detected issues for the current profiler rules."];
+            const confidenceRecommendationLines = confidenceDeductions.length ? confidenceDeductions.map((item, index) => [
+                `${index + 1}. ${item.issue}`,
+                `   Impact: ${item.impact}`,
+                `   Confidence Penalty: ${item.confidence_penalty}`,
+                `   Recommendation: ${item.recommendation}`,
+                `   Expected Confidence Gain: ${item.expected_confidence_gain}`
+            ].join("\n")) : ["No confidence deductions returned."];
+            const roadmapLines = Array.isArray(roadmap.actions) && roadmap.actions.length ? roadmap.actions.map(action => (
+                `${action.rank}. ${action.issue}\n   ${action.action}\n   Potential Gain: ${action.potential_gain}`
+            )) : ["No recovery actions returned."];
 
             return [
                 "MONAD PARALLEL EXECUTION OPTIMIZATION REPORT",
                 "============================================",
                 `Generated At: ${new Date().toISOString()}`,
+                `Analysis Timestamp: ${report.analysis_timestamp || "n/a"}`,
                 `Contract Name: ${report.contract_name || "UnknownContract"}`,
-                `Overall Parallel Readiness Score: ${score}/100`,
-                `Status: ${report.status || "Unknown"}`,
+                `Parallel Readiness Score: ${score}/100`,
+                `Parallel Classification: ${report.parallel_readiness_classification || report.status || "Unknown"}`,
+                `Deployment Confidence Score: ${confidenceScore}/100`,
+                `Deployment Confidence Classification: ${confidence.classification || "Unknown"}`,
                 "",
-                "CATEGORY SCORES",
-                "---------------",
+                "PARALLEL READINESS CATEGORY SCORES",
+                "----------------------------------",
                 ...(categoryLines.length ? categoryLines : ["- Category scores unavailable"]),
+                "",
+                "DEPLOYMENT CONFIDENCE BREAKDOWN",
+                "-------------------------------",
+                ...(confidenceLines.length ? confidenceLines : ["- Confidence scores unavailable"]),
+                "",
+                "STORAGE CONFLICT MAP SUMMARY",
+                "----------------------------",
+                ...conflictMapLines,
                 "",
                 "EXECUTIVE SUMMARY",
                 "-----------------",
@@ -564,7 +741,16 @@ contract PostOptimizedOrchestrator {
                 "",
                 "DETECTED ISSUES AND REFACTORING RECOMMENDATIONS",
                 "------------------------------------------------",
-                ...issueLines
+                ...issueLines,
+                "",
+                "CONFIDENCE BOOST RECOMMENDATIONS",
+                "--------------------------------",
+                ...confidenceRecommendationLines,
+                "",
+                "TOP ACTIONS TO REACH PRODUCTION READINESS",
+                "-----------------------------------------",
+                `Projected Confidence: ${roadmap.current_confidence ?? "--"} → ${roadmap.projected_confidence ?? "--"}`,
+                ...roadmapLines
             ].join("\n");
         }
 
