@@ -79,6 +79,7 @@
                     <div class="action-row">
                         <button id="run-button" class="run-btn" type="button" onclick="executeAdvancedDiagnostic()">Run AST Diagnostic Analysis</button>
                         <button class="secondary-btn" type="button" onclick="copyReport()">Copy report</button>
+                        <button class="secondary-btn" type="button" onclick="downloadOptimizationReport()">Download Optimization Report</button>
                     </div>
                     <p class="helper-text">Tip: press Ctrl + Enter to run the diagnostic.</p>
                 </section>
@@ -93,7 +94,7 @@
 
                     <div class="metrics-grid">
                         <article class="metric-box score-card">
-                            <span class="box-label">EFFICIENCY RATING</span>
+                            <span class="box-label">PARALLEL READINESS SCORE</span>
                             <div id="efficiency-display" class="metric-value">--</div>
                             <div class="score-track" aria-hidden="true"><span id="score-fill"></span></div>
                         </article>
@@ -110,6 +111,20 @@
                             <div id="primary-action" class="metric-value action-value">Awaiting source</div>
                         </article>
                     </div>
+
+                    <section class="scorecard-section" aria-label="Parallel readiness category scores">
+                        <h3><span class="cli-arrow">&gt;</span> Parallel Readiness Scorecard</h3>
+                        <div id="category-scorecard" class="category-scorecard">
+                            <div class="empty-log-msg">Category scores will appear after the diagnostic completes.</div>
+                        </div>
+                    </section>
+
+                    <section class="conflict-map-section" aria-label="Storage conflict map">
+                        <h3><span class="cli-arrow">&gt;</span> Storage Conflict Map</h3>
+                        <div id="storage-conflict-map" class="storage-conflict-map">
+                            <div class="empty-log-msg">No dependency tree generated yet.</div>
+                        </div>
+                    </section>
 
                     <div class="tabs" role="tablist" aria-label="Output views">
                         <button id="tab-conflicts" class="tab active" type="button" onclick="switchTab('conflicts')">Conflict trace</button>
@@ -284,6 +299,8 @@ contract PostOptimizedOrchestrator {
             document.getElementById("conflict-count").innerText = "--";
             document.getElementById("primary-action").innerText = "Awaiting source";
             document.getElementById("score-fill").style.width = "0%";
+            document.getElementById("category-scorecard").innerHTML = '<div class="empty-log-msg">Category scores will appear after the diagnostic completes.</div>';
+            document.getElementById("storage-conflict-map").innerHTML = '<div class="empty-log-msg">No dependency tree generated yet.</div>';
             document.getElementById("trace-logs").innerHTML = `<div class="empty-log-msg">${escapeHtml(message)}</div>`;
             document.getElementById("summary-panel").innerHTML = "<p>No report yet. Run the profiler to generate a use-case summary and implementation checklist.</p>";
         }
@@ -349,54 +366,133 @@ contract PostOptimizedOrchestrator {
         }
 
         function renderReport(report) {
-            const score = Number(report.efficiency_score ?? 0);
+            const score = Number(report.parallel_readiness_score ?? report.overall_score ?? report.efficiency_score ?? 0);
             const conflicts = Array.isArray(report.conflicts) ? report.conflicts : [];
             const badge = document.getElementById("status-display");
             const traceContainer = document.getElementById("trace-logs");
 
-            document.getElementById("efficiency-display").innerText = `${score}%`;
+            document.getElementById("efficiency-display").innerText = `${score}/100`;
             document.getElementById("score-fill").style.width = `${Math.max(0, Math.min(score, 100))}%`;
             document.getElementById("conflict-count").innerText = String(report.detected_vulnerabilities_count ?? conflicts.length);
             badge.innerText = report.status || (score >= 85 ? "Production Parallel Ready" : "Serialization Danger Warning");
             badge.className = score >= 85 ? "status-pill text-safe" : "status-pill text-alert";
             document.getElementById("primary-action").innerText = score >= 85 ? "Ship validation" : "Shard hot state";
 
-            if (score >= 85 && conflicts.length === 0) {
-                traceContainer.innerHTML = '<div class="clean-pass"><strong>STATUS CLEAR:</strong> Contract is optimized for parallel block execution. No shared storage collisions were detected.</div>';
-            } else {
-                traceContainer.innerHTML = "";
-                conflicts.forEach((issue, index) => {
-                    const severity = String(issue.severity || "medium").toLowerCase();
-                    const anomalyCard = document.createElement("article");
-                    anomalyCard.className = `anomaly-card ${severity}`;
-                    anomalyCard.innerHTML = `
-                        <div class="card-head">
-                            <span class="badge-type">[${escapeHtml(issue.severity || "INFO")}] ${escapeHtml(issue.type || "Profiler finding")}</span>
-                            <span class="line-tag">Line ${escapeHtml(issue.line || "n/a")}</span>
-                        </div>
-                        <p class="desc"><strong>Function:</strong> ${escapeHtml(issue.function || "unknown")}</p>
-                        <p class="desc"><strong>Impact Matrix:</strong> ${escapeHtml(issue.impact || "No impact provided.")}</p>
-                        <p class="remedy"><strong>Refactoring Blueprint:</strong> <code>${escapeHtml(issue.remediation || "Review state access pattern.")}</code></p>
-                    `;
-                    traceContainer.appendChild(anomalyCard);
-                });
-            }
-
-            renderSummary(score, conflicts);
+            renderCategoryScorecard(report.category_scores || {});
+            renderStorageConflictMap(report.storage_conflict_map || []);
+            renderConflictCards(conflicts, traceContainer, score);
+            renderSummary(report, score, conflicts);
         }
 
-        function renderSummary(score, conflicts) {
+        function renderCategoryScorecard(categoryScores) {
+            const scorecard = document.getElementById("category-scorecard");
+            const categories = [
+                "Storage Isolation",
+                "Write Contention",
+                "Loop Scalability",
+                "Sharding Readiness"
+            ];
+
+            scorecard.innerHTML = categories.map(label => {
+                const value = Number(categoryScores[label] ?? 100);
+                return `
+                    <article class="category-score-item">
+                        <div class="category-score-topline">
+                            <span>${escapeHtml(label)}</span>
+                            <strong>${value}/100</strong>
+                        </div>
+                        <div class="score-track compact" aria-hidden="true">
+                            <span style="width: ${Math.max(0, Math.min(value, 100))}%"></span>
+                        </div>
+                    </article>
+                `;
+            }).join("");
+        }
+
+        function renderConflictCards(conflicts, traceContainer, score) {
+            if (score >= 85 && conflicts.length === 0) {
+                traceContainer.innerHTML = '<div class="clean-pass"><strong>STATUS CLEAR:</strong> Contract is optimized for parallel block execution. No shared storage collisions were detected.</div>';
+                return;
+            }
+
+            if (!conflicts.length) {
+                traceContainer.innerHTML = '<div class="empty-log-msg">No conflicts were returned by the profiler.</div>';
+                return;
+            }
+
+            traceContainer.innerHTML = "";
+            conflicts.forEach(issue => {
+                const severity = String(issue.severity || "medium").toLowerCase();
+                const suggestion = issue.suggestion || {};
+                const refactor = suggestion.suggested_refactor || {};
+                const anomalyCard = document.createElement("article");
+                anomalyCard.className = `anomaly-card ${severity}`;
+                anomalyCard.innerHTML = `
+                    <div class="card-head">
+                        <span class="badge-type">[${escapeHtml(issue.severity || "INFO")}] ${escapeHtml(issue.type || "Profiler finding")}</span>
+                        <span class="line-tag">Line ${escapeHtml(issue.line || "n/a")}</span>
+                    </div>
+                    <p class="desc"><strong>Function:</strong> ${escapeHtml(issue.function || "unknown")}</p>
+                    <p class="desc"><strong>Storage Target:</strong> <code>${escapeHtml(issue.storage_target || "unknown")}</code></p>
+                    <div class="suggestion-block">
+                        <p><strong>Issue:</strong> ${escapeHtml(suggestion.issue || issue.type || "Profiler finding")}</p>
+                        <p><strong>Why It Matters:</strong> ${escapeHtml(suggestion.why_it_matters || issue.impact || "No impact provided.")}</p>
+                        <p><strong>Suggested Refactor:</strong></p>
+                        <div class="before-after-grid">
+                            <div>
+                                <span class="box-label">Before</span>
+                                <pre><code>${escapeHtml(refactor.before || "Review current shared state pattern.")}</code></pre>
+                            </div>
+                            <div>
+                                <span class="box-label">After</span>
+                                <pre><code>${escapeHtml(refactor.after || issue.remediation || "Apply a sharded storage pattern.")}</code></pre>
+                            </div>
+                        </div>
+                        <p class="remedy"><strong>Expected Benefit:</strong> ${escapeHtml(suggestion.expected_benefit || issue.remediation || "Improves parallel execution readiness.")}</p>
+                    </div>
+                `;
+                traceContainer.appendChild(anomalyCard);
+            });
+        }
+
+        function renderStorageConflictMap(conflictMap) {
+            const container = document.getElementById("storage-conflict-map");
+            if (!Array.isArray(conflictMap) || conflictMap.length === 0) {
+                container.innerHTML = '<div class="clean-pass"><strong>No conflict edges detected.</strong> Storage dependency tree is clear for the scanned patterns.</div>';
+                return;
+            }
+
+            container.innerHTML = conflictMap.map(group => {
+                const targets = Array.isArray(group.storage_targets) ? group.storage_targets : [];
+                const targetRows = targets.map(target => `
+                    <li>
+                        <span class="tree-connector" aria-hidden="true"></span>
+                        <span class="storage-node">${escapeHtml(target)}</span>
+                    </li>
+                `).join("");
+
+                return `
+                    <div class="conflict-tree">
+                        <div class="function-node">${escapeHtml(group.function || "unknownFunction")}()</div>
+                        <ul>${targetRows}</ul>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function renderSummary(report, score, conflicts) {
             const topSeverity = conflicts.some(item => item.severity === "CRITICAL") ? "critical" : conflicts.length ? "high" : "safe";
             const actions = conflicts.length
-                ? conflicts.map(item => `<li><strong>${escapeHtml(item.type)}:</strong> ${escapeHtml(item.remediation)}</li>`).join("")
+                ? conflicts.map(item => {
+                    const suggestion = item.suggestion || {};
+                    return `<li><strong>${escapeHtml(suggestion.issue || item.type)}:</strong> ${escapeHtml(suggestion.expected_benefit || item.remediation)}</li>`;
+                }).join("")
                 : "<li>Keep per-agent state isolated and re-run after future changes.</li>";
 
             document.getElementById("summary-panel").innerHTML = `
                 <div class="summary-status ${topSeverity}">
-                    <span class="box-label">READINESS NARRATIVE</span>
-                    <p>${score >= 85
-                        ? "The submitted contract avoids the profiler's known serialization traps and is ready for deeper Foundry/runtime validation."
-                        : "The submitted contract has shared mutable state patterns that can serialize transactions and reduce Monad parallel throughput."}</p>
+                    <span class="box-label">EXECUTIVE SUMMARY</span>
+                    <p>${escapeHtml(report.executive_summary || generateFallbackSummary(score, conflicts))}</p>
                 </div>
                 <h4>Recommended implementation checklist</h4>
                 <ul>${actions}</ul>
@@ -416,27 +512,98 @@ contract PostOptimizedOrchestrator {
             document.getElementById(`${tabName}-view`).classList.add("active");
         }
 
+        function generateFallbackSummary(score, conflicts) {
+            if (!conflicts.length) {
+                return `This contract has an overall Parallel Readiness Score of ${score}/100 with no detected storage conflict patterns.`;
+            }
+            const critical = conflicts.filter(item => item.severity === "CRITICAL").length;
+            const high = conflicts.filter(item => item.severity === "HIGH").length;
+            const topIssue = conflicts.find(item => item.severity === "CRITICAL") || conflicts[0];
+            return `This contract contains ${critical + high} high-risk serialization bottlenecks that are likely to reduce Monad parallel execution efficiency. The most critical issue is ${topIssue.storage_target || topIssue.type}. Adopting storage sharding patterns could significantly improve concurrency.`;
+        }
+
+        function buildOptimizationReport(report) {
+            const conflicts = Array.isArray(report.conflicts) ? report.conflicts : [];
+            const categoryScores = report.category_scores || {};
+            const score = report.parallel_readiness_score ?? report.overall_score ?? report.efficiency_score ?? 0;
+            const categoryLines = Object.entries(categoryScores).map(([label, value]) => `- ${label}: ${value}/100`);
+            const issueLines = conflicts.length ? conflicts.map((item, index) => {
+                const suggestion = item.suggestion || {};
+                const refactor = suggestion.suggested_refactor || {};
+                return [
+                    `${index + 1}. ${suggestion.issue || item.type}`,
+                    `   Severity: ${item.severity}`,
+                    `   Function: ${item.function || "unknown"}`,
+                    `   Storage Target: ${item.storage_target || "unknown"}`,
+                    `   Line: ${item.line || "n/a"}`,
+                    `   Why It Matters: ${suggestion.why_it_matters || item.impact || "No impact provided."}`,
+                    "   Suggested Refactor:",
+                    "   Before:",
+                    indentText(refactor.before || "Review current shared state pattern.", "     "),
+                    "   After:",
+                    indentText(refactor.after || item.remediation || "Apply a sharded storage pattern.", "     "),
+                    `   Expected Benefit: ${suggestion.expected_benefit || item.remediation || "Improves parallel execution readiness."}`
+                ].join("\n");
+            }) : ["No detected issues for the current profiler rules."];
+
+            return [
+                "MONAD PARALLEL EXECUTION OPTIMIZATION REPORT",
+                "============================================",
+                `Generated At: ${new Date().toISOString()}`,
+                `Contract Name: ${report.contract_name || "UnknownContract"}`,
+                `Overall Parallel Readiness Score: ${score}/100`,
+                `Status: ${report.status || "Unknown"}`,
+                "",
+                "CATEGORY SCORES",
+                "---------------",
+                ...(categoryLines.length ? categoryLines : ["- Category scores unavailable"]),
+                "",
+                "EXECUTIVE SUMMARY",
+                "-----------------",
+                report.executive_summary || generateFallbackSummary(score, conflicts),
+                "",
+                "DETECTED ISSUES AND REFACTORING RECOMMENDATIONS",
+                "------------------------------------------------",
+                ...issueLines
+            ].join("\n");
+        }
+
+        function indentText(value, prefix) {
+            return String(value || "").split("\n").map(line => `${prefix}${line}`).join("\n");
+        }
+
         async function copyReport() {
             if (!lastReport) {
                 alert("No report available yet. Run the diagnostic first.");
                 return;
             }
 
-            const conflicts = Array.isArray(lastReport.conflicts) ? lastReport.conflicts : [];
-            const reportText = [
-                `Efficiency score: ${lastReport.efficiency_score}%`,
-                `Status: ${lastReport.status}`,
-                `Conflicts: ${lastReport.detected_vulnerabilities_count ?? conflicts.length}`,
-                "",
-                ...conflicts.map((item, index) => `${index + 1}. [${item.severity}] ${item.type} on line ${item.line}\n   Impact: ${item.impact}\n   Remediation: ${item.remediation}`)
-            ].join("\n");
-
+            const reportText = buildOptimizationReport(lastReport);
             try {
                 await navigator.clipboard.writeText(reportText);
                 alert("Report copied to clipboard.");
             } catch (err) {
-                alert("Clipboard copy failed. Select and copy from the summary manually.");
+                alert("Clipboard copy failed. Use Download Optimization Report instead.");
             }
+        }
+
+        function downloadOptimizationReport() {
+            if (!lastReport) {
+                alert("No report available yet. Run the diagnostic first.");
+                return;
+            }
+
+            const reportText = buildOptimizationReport(lastReport);
+            const blob = new Blob([reportText], { type: "text/plain;charset=utf-8" });
+            const downloadUrl = URL.createObjectURL(blob);
+            const anchor = document.createElement("a");
+            const contractName = (lastReport.contract_name || "contract").replace(/[^a-z0-9_-]/gi, "_");
+            anchor.href = downloadUrl;
+            anchor.download = `${contractName}_optimization_report.txt`;
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            URL.revokeObjectURL(downloadUrl);
         }
 
         updateLineCount();
