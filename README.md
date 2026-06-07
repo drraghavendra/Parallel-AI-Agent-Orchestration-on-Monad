@@ -181,7 +181,20 @@ Example:
 PreOptimizedOrchestrator contains 3 high-risk serialization bottlenecks that are likely to reduce Monad parallel execution efficiency. The most critical issue is globalNonce in executeWorkflow. Overall Parallel Readiness Score is 44/100. Adopting storage sharding patterns could significantly improve concurrency.
 ```
 
----
+# Deployed Smart Contracts on Monad Testnet
+
+The following detailing information represent the Depoyment details using Remix IDE
+
+AgentStorageShard.sol Deployment Transaction ID  : 0x95929ade08e56421a6cbc0a91ca63de4c1e212828a8f25ee5dcaa1716e8ff9d1 
+
+MockDeFiProtocols.sol Deployment Transaction ID  :0x0c3d9fcea2ad1f4dd242eaa3e515976dfe5da11688505d535f88b176f8cb8a94
+
+PostOptimizedOrchestrator.sol Deployment  Transaction: 0xae126b865ae94b445057c62ccafdeca01af9a0384b90b3122e2294e55c360a43
+
+
+PreOptimizedOrchestrator.sol Deployment Transaction: 0xb402593374c8b89cf3bb12b44f6461cba7b21031ec1f047edcb0cf40a40494da
+
+
 
 ## Running Locally
 
