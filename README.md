@@ -1,6 +1,6 @@
 # Parallel AI Agent Orchestration on Monad
 
-Accelerating Autonomous Intelligence Through Concurrent Agent Execution
+# Accelerating Autonomous Intelligence Through Concurrent Agent Execution
 
 Parallel AI Agent Orchestration on Monad is an advanced multi-agent intelligence framework designed to leverage Monad's high-throughput execution environment for next-generation AI applications. The project explores how autonomous AI agents can collaborate, reason, execute, and coordinate in parallel rather than following traditional sequential workflows.
 
