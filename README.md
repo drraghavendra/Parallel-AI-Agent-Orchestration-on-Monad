@@ -239,12 +239,11 @@ The existing **Copy report** button also copies the richer report format to the 
 The backend generates a concise summary for each analysis.
 
 Example:
-
-```text
 PreOptimizedOrchestrator contains 3 high-risk serialization bottlenecks that are likely to reduce Monad parallel execution efficiency. The most critical issue is globalNonce in executeWorkflow. Overall Parallel Readiness Score is 44/100. Adopting storage sharding patterns could significantly improve concurrency.
 
 
-Potential Use Cases
+Potential Use Cases :
+
 Autonomous DeFi Operations
 Yield optimization
 Liquidity monitoring
