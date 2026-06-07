@@ -2,95 +2,445 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monad Auto-Parallel Profiler Terminal</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="terminal-container">
-        <header class="terminal-header">
-            <div class="window-buttons">
-                <span class="btn close"></span>
-                <span class="btn minimize"></span>
-                <span class="btn expand"></span>
+    <main class="app-shell">
+        <section class="hero-card">
+            <div class="hero-copy">
+                <p class="eyebrow">Monad Parallel-Native Optimizer</p>
+                <h1>Detect Solidity storage bottlenecks before they serialize execution.</h1>
+                <p class="hero-subtitle">
+                    Paste an orchestrator contract, run the profiler, and get a parallel-readiness score with targeted refactoring guidance for state locks, shared counters, and unbounded scans.
+                </p>
             </div>
-            <div class="title">MONAD PARALLEL-NATIVE DEFI OPTIMIZER ENGINE v2.0.0</div>
-        </header>
-
-        <div class="workspace">
-            <div class="panel left">
-                <h3><span class="cli-arrow">></span> Solidity Core Ingestion Buffer</h3>
-                <textarea id="editor-textarea" placeholder="Paste your orchestrator or DeFi contract here..."></textarea>
-                <button class="run-btn" onclick="executeAdvancedDiagnostic()">Run AST Diagnostic Analysis</button>
+            <div class="connection-card" aria-live="polite">
+                <span class="box-label">BACKEND STREAM</span>
+                <div id="backend-status" class="connection-status is-checking">CHECKING</div>
+                <label for="api-endpoint" class="endpoint-label">Profiler API endpoint</label>
+                <input id="api-endpoint" class="endpoint-input" value="http://localhost:8000/api/v2/optimize-profile" />
+                <button class="secondary-btn" type="button" onclick="checkBackendHealth()">Check connection</button>
             </div>
+        </section>
 
-            <div class="panel right">
-                <h3><span class="cli-arrow">></span> Engine Optimization Output Metrics</h3>
-                <div class="metrics-grid">
-                    <div class="metric-box">
-                        <span class="box-label">EFFICIENCY RATING</span>
-                        <div id="efficiency-display" class="metric-value">--</div>
-                    </div>
-                    <div class="metric-box">
-                        <span class="box-label">COMPILATION STATUS</span>
-                        <div id="status-display" class="status-pill text-neutral">READY</div>
-                    </div>
-                </div>
+        <section class="use-case-strip" aria-label="Use case flow">
+            <div class="flow-step">
+                <span class="step-index">01</span>
+                <strong>Ingest</strong>
+                <p>Load vulnerable or optimized Solidity and inspect the source buffer.</p>
+            </div>
+            <div class="flow-step">
+                <span class="step-index">02</span>
+                <strong>Profile</strong>
+                <p>Send code to the FastAPI AST profiler running on localhost.</p>
+            </div>
+            <div class="flow-step">
+                <span class="step-index">03</span>
+                <strong>Refactor</strong>
+                <p>Review conflict traces and apply sharding or mapping-based fixes.</p>
+            </div>
+            <div class="flow-step">
+                <span class="step-index">04</span>
+                <strong>Validate</strong>
+                <p>Re-run optimized code until the score reaches production-ready status.</p>
+            </div>
+        </section>
 
-                <h3><span class="cli-arrow">></span> Storage Conflict Trace Logs</h3>
-                <div id="trace-logs" class="logs-container">
-                    <div class="empty-log-msg">Awaiting ingestion matrix sequence... Please execute structural diagnostic profile.</div>
+        <div class="terminal-container">
+            <header class="terminal-header">
+                <div class="window-buttons" aria-hidden="true">
+                    <span class="btn close"></span>
+                    <span class="btn minimize"></span>
+                    <span class="btn expand"></span>
                 </div>
+                <div class="title">MONAD PARALLEL-NATIVE DEFI OPTIMIZER ENGINE v2.1.0</div>
+            </header>
+
+            <div class="workspace">
+                <section class="panel left-panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2><span class="cli-arrow">&gt;</span> Solidity Core Ingestion Buffer</h2>
+                            <p>Choose a demo or paste your own orchestrator contract.</p>
+                        </div>
+                        <span id="line-count" class="mini-pill">0 lines</span>
+                    </div>
+
+                    <div class="example-toolbar" role="group" aria-label="Example contracts">
+                        <button type="button" class="secondary-btn" onclick="loadExample('pre')">Load vulnerable example</button>
+                        <button type="button" class="secondary-btn" onclick="loadExample('post')">Load optimized example</button>
+                        <button type="button" class="ghost-btn" onclick="clearEditor()">Clear</button>
+                    </div>
+
+                    <textarea id="editor-textarea" spellcheck="false" placeholder="Paste your orchestrator or DeFi contract here..."></textarea>
+
+                    <div class="action-row">
+                        <button id="run-button" class="run-btn" type="button" onclick="executeAdvancedDiagnostic()">Run AST Diagnostic Analysis</button>
+                        <button class="secondary-btn" type="button" onclick="copyReport()">Copy report</button>
+                    </div>
+                    <p class="helper-text">Tip: press Ctrl + Enter to run the diagnostic.</p>
+                </section>
+
+                <section class="panel right-panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2><span class="cli-arrow">&gt;</span> Optimization Output Metrics</h2>
+                            <p>Parallel-readiness score and conflict trace for the submitted source.</p>
+                        </div>
+                    </div>
+
+                    <div class="metrics-grid">
+                        <article class="metric-box score-card">
+                            <span class="box-label">EFFICIENCY RATING</span>
+                            <div id="efficiency-display" class="metric-value">--</div>
+                            <div class="score-track" aria-hidden="true"><span id="score-fill"></span></div>
+                        </article>
+                        <article class="metric-box">
+                            <span class="box-label">COMPILATION STATUS</span>
+                            <div id="status-display" class="status-pill text-neutral">READY</div>
+                        </article>
+                        <article class="metric-box">
+                            <span class="box-label">CONFLICTS FOUND</span>
+                            <div id="conflict-count" class="metric-value small">--</div>
+                        </article>
+                        <article class="metric-box">
+                            <span class="box-label">PRIMARY ACTION</span>
+                            <div id="primary-action" class="metric-value action-value">Awaiting source</div>
+                        </article>
+                    </div>
+
+                    <div class="tabs" role="tablist" aria-label="Output views">
+                        <button id="tab-conflicts" class="tab active" type="button" onclick="switchTab('conflicts')">Conflict trace</button>
+                        <button id="tab-summary" class="tab" type="button" onclick="switchTab('summary')">Executive summary</button>
+                    </div>
+
+                    <div id="conflicts-view" class="tab-view active">
+                        <h3><span class="cli-arrow">&gt;</span> Storage Conflict Trace Logs</h3>
+                        <div id="trace-logs" class="logs-container">
+                            <div class="empty-log-msg">Awaiting ingestion matrix sequence. Load an example or paste Solidity, then run the diagnostic profile.</div>
+                        </div>
+                    </div>
+
+                    <div id="summary-view" class="tab-view">
+                        <h3><span class="cli-arrow">&gt;</span> Refactor Playbook</h3>
+                        <div id="summary-panel" class="summary-panel">
+                            <p>No report yet. Run the profiler to generate a use-case summary and implementation checklist.</p>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
-    </div>
+    </main>
 
     <script>
+        const examples = {
+            pre: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract PreOptimizedOrchestrator {
+    struct SystemConfig {
+        uint128 platformFeeBps;
+        uint128 safetyBuffer;
+        address treasury;
+    }
+
+    mapping(address => uint256) public agentBalances;
+    address[] public registeredAgents;
+    SystemConfig public globalConfig;
+    uint256 public totalVolume;
+    uint256 public globalNonce;
+
+    event Executed(address indexed agent, uint256 amount, uint256 nonce);
+
+    constructor(address _treasury) {
+        globalConfig = SystemConfig(30, 100, _treasury);
+    }
+
+    function executeWorkflow(address agent, uint256 amount) external {
+        globalNonce++;
+        totalVolume += amount;
+
+        bool exists = false;
+        for (uint256 i = 0; i < registeredAgents.length; i++) {
+            if (registeredAgents[i] == agent) {
+                exists = true;
+                break;
+            }
+        }
+        if (!exists) {
+            registeredAgents.push(agent);
+        }
+
+        uint256 fee = (amount * globalConfig.platformFeeBps) / 10000;
+        agentBalances[agent] += (amount - fee);
+        agentBalances[globalConfig.treasury] += fee;
+
+        emit Executed(agent, amount, globalNonce);
+    }
+}`,
+            post: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+interface IAgentStorageShard {
+    function recordExecution(uint256 amount) external;
+}
+
+contract PostOptimizedOrchestrator {
+    address public immutable shardImplementation;
+
+    mapping(address => address) public agentShards;
+    mapping(address => uint256) public shardedVolume;
+    mapping(address => bool) private shardedLocks;
+
+    event ShardDeployed(address indexed agent, address shardAddress);
+    event ParallelWorkflowExecuted(address indexed agent, uint256 finalYieldOut);
+
+    modifier nonReentrantSharded() {
+        require(!shardedLocks[msg.sender], "Sharded Reentrancy Lock Triggered");
+        shardedLocks[msg.sender] = true;
+        _;
+        shardedLocks[msg.sender] = false;
+    }
+
+    constructor(address implementation) {
+        require(implementation != address(0), "Invalid implementation");
+        shardImplementation = implementation;
+    }
+
+    function createAgentShard(address shard) external {
+        require(agentShards[msg.sender] == address(0), "Shard already exists");
+        agentShards[msg.sender] = shard;
+        emit ShardDeployed(msg.sender, shard);
+    }
+
+    function executeParallelWorkflow(uint256 initialAmount) external nonReentrantSharded {
+        address shardAddress = agentShards[msg.sender];
+        require(shardAddress != address(0), "Initialize shard first");
+
+        IAgentStorageShard(shardAddress).recordExecution(initialAmount);
+
+        unchecked {
+            shardedVolume[msg.sender] += initialAmount;
+        }
+
+        emit ParallelWorkflowExecuted(msg.sender, initialAmount);
+    }
+}`
+        };
+
+        let lastReport = null;
+
+        const editor = document.getElementById("editor-textarea");
+        editor.addEventListener("input", updateLineCount);
+        document.addEventListener("keydown", (event) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                executeAdvancedDiagnostic();
+            }
+        });
+
+        function getEndpoint() {
+            return document.getElementById("api-endpoint").value.trim() || "http://localhost:8000/api/v2/optimize-profile";
+        }
+
+        function getHealthEndpoint() {
+            return getEndpoint().replace(/\/api\/v2\/optimize-profile\/?$/, "/api/v2/health");
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function updateLineCount() {
+            const code = editor.value;
+            const count = code ? code.split("\n").length : 0;
+            document.getElementById("line-count").innerText = `${count} line${count === 1 ? "" : "s"}`;
+        }
+
+        function loadExample(type) {
+            editor.value = examples[type];
+            updateLineCount();
+            editor.focus();
+            resetReport(`Loaded ${type === "pre" ? "vulnerable" : "optimized"} use-case example. Run the diagnostic to profile it.`);
+        }
+
+        function clearEditor() {
+            editor.value = "";
+            updateLineCount();
+            resetReport("Awaiting ingestion matrix sequence. Load an example or paste Solidity, then run the diagnostic profile.");
+        }
+
+        function resetReport(message) {
+            lastReport = null;
+            document.getElementById("efficiency-display").innerText = "--";
+            document.getElementById("status-display").innerText = "READY";
+            document.getElementById("status-display").className = "status-pill text-neutral";
+            document.getElementById("conflict-count").innerText = "--";
+            document.getElementById("primary-action").innerText = "Awaiting source";
+            document.getElementById("score-fill").style.width = "0%";
+            document.getElementById("trace-logs").innerHTML = `<div class="empty-log-msg">${escapeHtml(message)}</div>`;
+            document.getElementById("summary-panel").innerHTML = "<p>No report yet. Run the profiler to generate a use-case summary and implementation checklist.</p>";
+        }
+
+        function setBackendStatus(state, label) {
+            const status = document.getElementById("backend-status");
+            status.className = `connection-status ${state}`;
+            status.innerText = label;
+        }
+
+        async function checkBackendHealth() {
+            setBackendStatus("is-checking", "CHECKING");
+            try {
+                const response = await fetch(getHealthEndpoint(), { method: "GET" });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                setBackendStatus("is-online", "ONLINE");
+            } catch (err) {
+                setBackendStatus("is-offline", "OFFLINE");
+            }
+        }
+
         async function executeAdvancedDiagnostic() {
-            const codePayload = document.getElementById("editor-textarea").value;
-            if(!codePayload.trim()) return alert("Error: Ingestion buffer target is empty.");
+            const codePayload = editor.value;
+            if (!codePayload.trim()) {
+                alert("Error: Ingestion buffer target is empty.");
+                return;
+            }
 
             const traceContainer = document.getElementById("trace-logs");
+            const runButton = document.getElementById("run-button");
+            runButton.disabled = true;
+            runButton.innerText = "Scanning AST...";
             traceContainer.innerHTML = '<div class="loading-msg">Executing Abstract Syntax Tree conflict scan execution routine...</div>';
 
             try {
-                const queryResponse = await fetch("http://localhost:8000/api/v2/optimize-profile", {
+                const queryResponse = await fetch(getEndpoint(), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ source_code: codePayload })
                 });
-                
-                const report = await queryResponse.json();
-                
-                // Render metrics panel modifications
-                document.getElementById("efficiency-display").innerText = report.efficiency_score + "%";
-                const badge = document.getElementById("status-display");
-                badge.innerText = report.status;
 
-                if(report.efficiency_score >= 85) {
-                    badge.className = "status-pill text-safe";
-                    traceContainer.innerHTML = '<div class="clean-pass">🎉 STATUS CLEAR: Contract completely optimized for parallel block execution on Monad engine tracks. No shared storage collisions found.</div>';
-                } else {
-                    badge.className = "status-pill text-alert";
-                    traceContainer.innerHTML = ""; // Wipe container loading states
-                    
-                    report.conflicts.forEach(issue => {
-                        const anomalyCard = document.createElement("div");
-                        anomalyCard.className = `anomaly-card ${issue.severity.toLowerCase()}`;
-                        anomalyCard.innerHTML = `
-                            <div class="card-head">
-                                <span class="badge-type">[${issue.severity}] ${issue.type}</span>
-                                <span class="line-tag">Line Indicator: ${issue.line}</span>
-                            </div>
-                            <p class="desc"><strong>Impact Matrix:</strong> ${issue.impact}</p>
-                            <p class="remedy"><strong>Refactoring Blueprint:</strong> <code>${issue.reremediation || issue.remediation}</code></p>
-                        `;
-                        traceContainer.appendChild(anomalyCard);
-                    });
+                if (!queryResponse.ok) {
+                    const errorBody = await queryResponse.text();
+                    throw new Error(errorBody || `HTTP ${queryResponse.status}`);
                 }
+
+                const report = await queryResponse.json();
+                lastReport = report;
+                setBackendStatus("is-online", "ONLINE");
+                renderReport(report);
             } catch (err) {
-                traceContainer.innerHTML = `<div class="error-msg">Fatal Engine Crash: Unable to establish endpoint stream to backend parsing engine service.</div>`;
+                setBackendStatus("is-offline", "OFFLINE");
+                traceContainer.innerHTML = `
+                    <div class="error-msg">
+                        <strong>Endpoint stream unavailable.</strong>
+                        <p>Start the backend from <code>profiler-engine</code> with <code>pip install -r requirements.txt</code> and <code>python server.py</code>, then retry.</p>
+                        <p class="muted">Details: ${escapeHtml(err.message)}</p>
+                    </div>`;
+            } finally {
+                runButton.disabled = false;
+                runButton.innerText = "Run AST Diagnostic Analysis";
             }
         }
+
+        function renderReport(report) {
+            const score = Number(report.efficiency_score ?? 0);
+            const conflicts = Array.isArray(report.conflicts) ? report.conflicts : [];
+            const badge = document.getElementById("status-display");
+            const traceContainer = document.getElementById("trace-logs");
+
+            document.getElementById("efficiency-display").innerText = `${score}%`;
+            document.getElementById("score-fill").style.width = `${Math.max(0, Math.min(score, 100))}%`;
+            document.getElementById("conflict-count").innerText = String(report.detected_vulnerabilities_count ?? conflicts.length);
+            badge.innerText = report.status || (score >= 85 ? "Production Parallel Ready" : "Serialization Danger Warning");
+            badge.className = score >= 85 ? "status-pill text-safe" : "status-pill text-alert";
+            document.getElementById("primary-action").innerText = score >= 85 ? "Ship validation" : "Shard hot state";
+
+            if (score >= 85 && conflicts.length === 0) {
+                traceContainer.innerHTML = '<div class="clean-pass"><strong>STATUS CLEAR:</strong> Contract is optimized for parallel block execution. No shared storage collisions were detected.</div>';
+            } else {
+                traceContainer.innerHTML = "";
+                conflicts.forEach((issue, index) => {
+                    const severity = String(issue.severity || "medium").toLowerCase();
+                    const anomalyCard = document.createElement("article");
+                    anomalyCard.className = `anomaly-card ${severity}`;
+                    anomalyCard.innerHTML = `
+                        <div class="card-head">
+                            <span class="badge-type">[${escapeHtml(issue.severity || "INFO")}] ${escapeHtml(issue.type || "Profiler finding")}</span>
+                            <span class="line-tag">Line ${escapeHtml(issue.line || "n/a")}</span>
+                        </div>
+                        <p class="desc"><strong>Function:</strong> ${escapeHtml(issue.function || "unknown")}</p>
+                        <p class="desc"><strong>Impact Matrix:</strong> ${escapeHtml(issue.impact || "No impact provided.")}</p>
+                        <p class="remedy"><strong>Refactoring Blueprint:</strong> <code>${escapeHtml(issue.remediation || "Review state access pattern.")}</code></p>
+                    `;
+                    traceContainer.appendChild(anomalyCard);
+                });
+            }
+
+            renderSummary(score, conflicts);
+        }
+
+        function renderSummary(score, conflicts) {
+            const topSeverity = conflicts.some(item => item.severity === "CRITICAL") ? "critical" : conflicts.length ? "high" : "safe";
+            const actions = conflicts.length
+                ? conflicts.map(item => `<li><strong>${escapeHtml(item.type)}:</strong> ${escapeHtml(item.remediation)}</li>`).join("")
+                : "<li>Keep per-agent state isolated and re-run after future changes.</li>";
+
+            document.getElementById("summary-panel").innerHTML = `
+                <div class="summary-status ${topSeverity}">
+                    <span class="box-label">READINESS NARRATIVE</span>
+                    <p>${score >= 85
+                        ? "The submitted contract avoids the profiler's known serialization traps and is ready for deeper Foundry/runtime validation."
+                        : "The submitted contract has shared mutable state patterns that can serialize transactions and reduce Monad parallel throughput."}</p>
+                </div>
+                <h4>Recommended implementation checklist</h4>
+                <ul>${actions}</ul>
+                <h4>Localhost run checklist</h4>
+                <ol>
+                    <li>Start backend: <code>cd profiler-engine</code>, <code>pip install -r requirements.txt</code>, <code>python server.py</code>.</li>
+                    <li>Serve or open <code>dashboard/index.html</code>.</li>
+                    <li>Check the backend stream status, load an example, and run the diagnostic.</li>
+                </ol>
+            `;
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll(".tab").forEach(tab => tab.classList.remove("active"));
+            document.querySelectorAll(".tab-view").forEach(view => view.classList.remove("active"));
+            document.getElementById(`tab-${tabName}`).classList.add("active");
+            document.getElementById(`${tabName}-view`).classList.add("active");
+        }
+
+        async function copyReport() {
+            if (!lastReport) {
+                alert("No report available yet. Run the diagnostic first.");
+                return;
+            }
+
+            const conflicts = Array.isArray(lastReport.conflicts) ? lastReport.conflicts : [];
+            const reportText = [
+                `Efficiency score: ${lastReport.efficiency_score}%`,
+                `Status: ${lastReport.status}`,
+                `Conflicts: ${lastReport.detected_vulnerabilities_count ?? conflicts.length}`,
+                "",
+                ...conflicts.map((item, index) => `${index + 1}. [${item.severity}] ${item.type} on line ${item.line}\n   Impact: ${item.impact}\n   Remediation: ${item.remediation}`)
+            ].join("\n");
+
+            try {
+                await navigator.clipboard.writeText(reportText);
+                alert("Report copied to clipboard.");
+            } catch (err) {
+                alert("Clipboard copy failed. Select and copy from the summary manually.");
+            }
+        }
+
+        updateLineCount();
+        checkBackendHealth();
     </script>
 </body>
 </html>
