@@ -250,11 +250,9 @@ AI-Powered Research Networks:Parallel information gathering,Cross-source verific
 
 Cybersecurity Intelligence:Threat detection,Attack surface analysis,Incident response coordination,Vulnerability prioritization
 
-Automation: Workflow orchestration,Business process optimization,Multi-department coordination
+Automation: Workflow orchestration,Business process optimization,Multi-department coordination,Decision support systems
 
-Decision support systems: Decentralized Autonomous Organizations (DAOs),Governance proposal analysis
-
-Community sentiment evaluation :Voting assistance,Treasury intelligence
+Decentralized Autonomous Organizations (DAOs):Governance proposal analysis,Community sentiment evaluation,Voting assistance,Treasury intelligence
 
 # Deployed Smart Contracts on Monad Testnet
 
