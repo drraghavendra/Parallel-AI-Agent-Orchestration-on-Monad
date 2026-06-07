@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Monad Auto-Parallel Profiler Terminal</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="terminal-container">
+        <header class="terminal-header">
+            <div class="window-buttons">
+                <span class="btn close"></span>
+                <span class="btn minimize"></span>
+                <span class="btn expand"></span>
+            </div>
+            <div class="title">MONAD PARALLEL-NATIVE DEFI OPTIMIZER ENGINE v2.0.0</div>
+        </header>
+
+        <div class="workspace">
+            <div class="panel left">
+                <h3><span class="cli-arrow">></span> Solidity Core Ingestion Buffer</h3>
+                <textarea id="editor-textarea" placeholder="Paste your orchestrator or DeFi contract here..."></textarea>
+                <button class="run-btn" onclick="executeAdvancedDiagnostic()">Run AST Diagnostic Analysis</button>
+            </div>
+
+            <div class="panel right">
+                <h3><span class="cli-arrow">></span> Engine Optimization Output Metrics</h3>
+                <div class="metrics-grid">
+                    <div class="metric-box">
+                        <span class="box-label">EFFICIENCY RATING</span>
+                        <div id="efficiency-display" class="metric-value">--</div>
+                    </div>
+                    <div class="metric-box">
+                        <span class="box-label">COMPILATION STATUS</span>
+                        <div id="status-display" class="status-pill text-neutral">READY</div>
+                    </div>
+                </div>
+
+                <h3><span class="cli-arrow">></span> Storage Conflict Trace Logs</h3>
+                <div id="trace-logs" class="logs-container">
+                    <div class="empty-log-msg">Awaiting ingestion matrix sequence... Please execute structural diagnostic profile.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function executeAdvancedDiagnostic() {
+            const codePayload = document.getElementById("editor-textarea").value;
+            if(!codePayload.trim()) return alert("Error: Ingestion buffer target is empty.");
+
+            const traceContainer = document.getElementById("trace-logs");
+            traceContainer.innerHTML = '<div class="loading-msg">Executing Abstract Syntax Tree conflict scan execution routine...</div>';
+
+            try {
+                const queryResponse = await fetch("http://localhost:8000/api/v2/optimize-profile", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ source_code: codePayload })
+                });
+                
+                const report = await queryResponse.json();
+                
+                // Render metrics panel modifications
+                document.getElementById("efficiency-display").innerText = report.efficiency_score + "%";
+                const badge = document.getElementById("status-display");
+                badge.innerText = report.status;
+
+                if(report.efficiency_score >= 85) {
+                    badge.className = "status-pill text-safe";
+                    traceContainer.innerHTML = '<div class="clean-pass">🎉 STATUS CLEAR: Contract completely optimized for parallel block execution on Monad engine tracks. No shared storage collisions found.</div>';
+                } else {
+                    badge.className = "status-pill text-alert";
+                    traceContainer.innerHTML = ""; // Wipe container loading states
+                    
+                    report.conflicts.forEach(issue => {
+                        const anomalyCard = document.createElement("div");
+                        anomalyCard.className = `anomaly-card ${issue.severity.toLowerCase()}`;
+                        anomalyCard.innerHTML = `
+                            <div class="card-head">
+                                <span class="badge-type">[${issue.severity}] ${issue.type}</span>
+                                <span class="line-tag">Line Indicator: ${issue.line}</span>
+                            </div>
+                            <p class="desc"><strong>Impact Matrix:</strong> ${issue.impact}</p>
+                            <p class="remedy"><strong>Refactoring Blueprint:</strong> <code>${issue.reremediation || issue.remediation}</code></p>
+                        `;
+                        traceContainer.appendChild(anomalyCard);
+                    });
+                }
+            } catch (err) {
+                traceContainer.innerHTML = `<div class="error-msg">Fatal Engine Crash: Unable to establish endpoint stream to backend parsing engine service.</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
