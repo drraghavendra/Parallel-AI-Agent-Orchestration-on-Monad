@@ -6,7 +6,7 @@ import uvicorn
 
 app = FastAPI(
     title="Monad Parallel-Native Optimizer Engine Backend",
-    version="2.2.0"
+    version="2.3.0"
 )
 
 # Active Cross-Origin Resource Sharing protocol limits
